@@ -51,3 +51,30 @@ export function useState(initialValue) {
 
   return [stateStore[currentCursor], setState];
 }
+
+
+export function setupEventDelegation(rootContainer) {
+  const supportedEvents = ["click", "input", "keydown"];
+
+  supportedEvents.forEach(eventType => {
+    rootContainer.addEventListener(eventType, event => {
+      let target = event.target;
+
+      const handlerName =
+        "on" +
+        eventType.charAt(0).toUpperCase() +
+        eventType.slice(1);
+
+      while (target && target !== rootContainer) {
+        const handler = target.__vnode?.props?.[handlerName];
+
+        if (typeof handler === "function") {
+          handler(event);
+          break;
+        }
+
+        target = target.parentElement;
+      }
+    });
+  });
+}
