@@ -78,3 +78,113 @@ export function setupEventDelegation(rootContainer) {
     });
   });
 }
+
+
+export function createTextElement(text) {
+  return {
+    type: "TEXT_ELEMENT",
+    props: { nodeValue: String(text) },
+    children: []
+  };
+}
+
+export function createElement(type, props, ...children) {
+  return {
+    type,
+    props: props ?? {},
+    children: children
+      .flat(Infinity)
+      .filter(child =>
+        child !== null &&
+        child !== undefined &&
+        typeof child !== "boolean"
+      )
+      .map(child =>
+        typeof child === "object"
+          ? child
+          : createTextElement(child)
+      )
+  };
+}
+
+export function renderToDOM(vnode) {
+  if (vnode.type === "TEXT_ELEMENT") {
+    return document.createTextNode(vnode.props.nodeValue);
+  }
+
+  const dom = document.createElement(vnode.type);
+
+  // Lưu VNode để Event Delegation sử dụng
+  dom.__vnode = vnode;
+
+  for (const [key, value] of Object.entries(vnode.props)) {
+    if (key.startsWith("on") || key === "children") {
+      continue;
+    }
+
+    if (key === "className") {
+      dom.setAttribute("class", value);
+    } else if (key === "value") {
+      dom.value = value;
+    } else if (key === "checked") {
+      dom.checked = Boolean(value);
+    } else if (value !== null && value !== undefined) {
+      dom.setAttribute(key, String(value));
+    }
+  }
+
+  for (const child of vnode.children) {
+    dom.appendChild(renderToDOM(child));
+  }
+
+  return dom;
+}
+
+
+let rootContainer = null;
+let rootComponent = null;
+let delegationInitialized = false;
+
+export function renderApp(component, container) {
+  rootComponent = component;
+  rootContainer = container;
+
+  if (!delegationInitialized) {
+    setupEventDelegation(rootContainer);
+    delegationInitialized = true;
+  }
+
+  setRenderer(() => {
+    resetCursor();
+
+    const vnode = rootComponent();
+    const dom = renderToDOM(vnode);
+
+    
+const activeElement = document.activeElement;
+const wasInputFocused =
+  activeElement?.tagName === "INPUT" &&
+  rootContainer.contains(activeElement);
+
+const selectionStart = wasInputFocused
+  ? activeElement.selectionStart
+  : null;
+
+rootContainer.replaceChildren(dom);
+
+if (wasInputFocused) {
+  const input = rootContainer.querySelector("input");
+
+  if (input) {
+    input.focus();
+
+    if (selectionStart !== null) {
+      input.setSelectionRange(selectionStart, selectionStart);
+    }
+  }
+}
+
+  });
+
+  triggerRender();
+}
